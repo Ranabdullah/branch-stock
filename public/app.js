@@ -34,19 +34,23 @@ async function api(route, body) {
 function render() {
   const owner = data.role === 'owner';
   const shops = data.shops.filter(shop => shop.active);
-  if (!shops.some(shop => shop.id === selected)) selected = shops[0]?.id;
+  const archived = owner ? data.shops.filter(shop => !shop.active) : [];
+  const visibleShops = [...shops, ...archived];
+  if (!visibleShops.some(shop => shop.id === selected)) selected = visibleShops[0]?.id;
+  const activeShop = shops.some(shop => shop.id === selected);
   $('#mode').textContent = token ? (owner ? 'Owner workspace' : 'Shop workspace') : 'Demo · sample products';
   $('#connect').hidden = Boolean(token);
   $('#owner').hidden = false;
   $('#shopForm').hidden = !owner;
   $('#shopForm').style.display = owner ? '' : 'none';
-  $('#shopActions').hidden = !owner || !selected;
+  $('#shopActions').hidden = !owner || !activeShop;
   $('#link').hidden = !token;
-  $('#shops').innerHTML = shops.map(shop => `<option value="${shop.id}">${h(shop.name)}</option>`).join('');
+  $('#shops').innerHTML = visibleShops.map(shop => `<option value="${shop.id}">${h(shop.name)}${shop.active ? '' : ' (archived)'}</option>`).join('');
   $('#shops').value = selected ?? '';
-  const products = selected ? data.products.filter(p => p.active && (!p.shop_id || p.shop_id === selected)) : [];
+  const products = activeShop ? data.products.filter(p => p.active && (!p.shop_id || p.shop_id === selected)) : [];
   const amount = id => data.stock.find(row => row.shop_id === selected && row.product_id === id)?.quantity ?? 0;
-  $('#stock').innerHTML = products.map(p => `<tr><td>${h(p.name)}</td><td>${h(p.sku || '—')}</td><td>${amount(p.id)}</td><td><button data-move="${p.id}">Adjust stock</button>${owner ? `<button data-archive="${p.id}">Archive</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="4">Add a shop and a product to start tracking stock.</td></tr>';
+  const emptyInventory = selected && !activeShop ? 'Archived shop. Its movements are available below.' : 'Add a shop and a product to start tracking stock.';
+  $('#stock').innerHTML = products.map(p => `<tr><td>${h(p.name)}</td><td>${h(p.sku || '—')}</td><td>${amount(p.id)}</td><td><button data-move="${p.id}">Adjust stock</button>${owner ? `<button data-archive="${p.id}">Archive</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="4">${emptyInventory}</td></tr>`;
   $('#movements').innerHTML = data.movements.filter(m => m.shop_id === selected).map(m => `<tr>
     <td><time datetime="${h(m.recorded_at)}" title="${h(m.recorded_at)}">${h(new Date(m.recorded_at).toLocaleString())}</time></td>
     <td>${h(data.products.find(p => p.id === m.product_id)?.name ?? 'Archived product')}</td>
