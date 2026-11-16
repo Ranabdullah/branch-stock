@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Branch Stock · Local Demo</title><link rel="stylesheet" href="style.css"><script defer src="app.js"></script></head>
+<body><header><div><strong>Branch Stock</strong><span class="tag">Local demo</span></div><nav aria-label="Sections"><button data-view="inventory">Inventory</button><button data-view="movement">Movements</button><button data-view="manage">Manage</button></nav></header>
+<main><div class="intro"><div><h1 id="title">Inventory</h1><p class="muted">Sample catalogue · changes stay in this browser.</p></div><button id="reset">Reset sample data</button></div><p id="message" role="status"></p>
+<section id="inventory" data-panel>
+<div class="filters"><label>Shop <select id="shop"></select></label><label>Search stock<input id="search" type="search" placeholder="Product, category or SKU"></label><label class="check"><input id="low" type="checkbox"> Low stock only</label></div>
+<div id="stockSummary" class="stats"></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>SKU</th><th>In stock</th><th>Expiry</th><th>Actions</th></tr></thead><tbody id="stock"></tbody></table></div></section>
+<section id="movement" data-panel hidden>
+<div class="filters"><label>Period <select id="movementRange"><option value="today">Today</option><option value="7d">Last 7 days</option><option value="30d" selected>Last 30 days</option><option value="90d">Last 90 days</option><option value="all">All dates</option></select></label>
+<label>Type <select id="movementType"><option value="all">All movements</option><option value="added">Units in</option><option value="gone">Units out</option></select></label>
+<label>Shop <select id="movementShop"></select></label><label>Search log<input id="movementSearch" type="search" placeholder="Product, shop or note"></label><button id="csv">Export CSV</button><button id="print">Print / Save PDF</button></div>
+<div id="movementSummary" class="stats"></div><div id="charts" class="charts"></div>
+<div class="table-wrap"><table><thead><tr><th>Date and time</th><th>Shop</th><th>Product</th><th>Type</th><th>Before</th><th>After</th><th>Change</th><th>Note</th></tr></thead><tbody id="log"></tbody></table></div>
+</section>
+<section id="manage" data-panel hidden><div class="charts">
+<div><h2>Shops</h2><form id="shopForm"><label>Shop name<input name="name" required maxlength="80"></label><button>Add shop</button></form><ul id="shops"></ul></div>
+<div><h2>Products</h2><form id="productForm"><label>Product<input name="name" required maxlength="80"></label><label>Category<input name="category" required maxlength="60"></label><label>SKU<input name="sku" maxlength="50"></label><label>Low stock at<input name="threshold" required type="number" min="0" max="1000000" value="5"></label><button>Add product</button></form><ul id="products"></ul></div>
+</div></section>
+</main><dialog id="adjustDialog"><form id="adjustForm"><h2 id="adjustTitle">Adjust stock</h2><p id="adjustQuantity"></p><label>Movement <select name="kind"><option value="in">Stock in</option><option value="out">Stock out</option><option value="set">Set exact count</option></select></label><label>Quantity<input name="quantity" required type="number" min="0" max="1000000"></label><label>Note<input name="note" maxlength="180"></label><button>Save movement</button> <button id="cancel" type="button">Cancel</button></form></dialog>
+<dialog id="expiryDialog" aria-labelledby="expiryTitle"><form id="expiryForm"><h2 id="expiryTitle">Expiry date</h2><label>Expiry date<input name="date" type="date"></label><p>Leave blank to clear the expiry date.</p><button>Save expiry</button> <button id="cancelExpiry" type="button">Cancel</button></form></dialog>
+</body></html>
