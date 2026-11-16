@@ -1,6 +1,6 @@
 # Branch Stock
 
-Open the [demo](https://branch-stock-demo.ranakaharian1.workers.dev/) to try fictional products and shops. Demo edits stay in that browser.
+Open the [demo](https://branch-stock-demo.ranakaharian1.workers.dev/) to try fictional products and shops. Choose **Try the shop view** to see what a shop can edit, or open the [sample Harbour Shop](https://branch-stock-demo.ranakaharian1.workers.dev/?sample-shop=harbour) directly. Both views use the same sample data in that browser. **Reset sample data** restores the examples.
 
 For a shared installation, use an owner key to create shops and catalogue products. In the inventory, select a shop and choose **Create / replace shop link**. Send the link privately to that shop. A shop can adjust counts, record stock in or out, or create products specific to its location. A shop link grants access to whoever holds it. Replacing the link or archiving the shop revokes it.
 

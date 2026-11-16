@@ -12,6 +12,7 @@ const sample = {
 };
 let data;
 let selected;
+let demoShop = '';
 let token = new URLSearchParams(location.hash.slice(1)).get('shop') || '';
 if (token) history.replaceState(null,'',location.pathname);
 let movement;
@@ -32,21 +33,30 @@ async function api(route, body) {
 }
 
 function render() {
-  const owner = data.role === 'owner';
-  const shops = data.shops.filter(shop => shop.active);
+  const owner = data.role === 'owner' && !demoShop;
+  const shops = data.shops.filter(shop => shop.active && (!demoShop || shop.id === demoShop));
   const archived = owner ? data.shops.filter(shop => !shop.active) : [];
   const visibleShops = [...shops, ...archived];
   if (!visibleShops.some(shop => shop.id === selected)) selected = visibleShops[0]?.id;
   const activeShop = shops.some(shop => shop.id === selected);
-  $('#mode').textContent = token ? (owner ? 'Owner workspace' : 'Shop workspace') : 'Demo · sample products';
+  $('#mode').textContent = token ? (owner ? 'Owner workspace' : 'Shop workspace') : (demoShop ? 'Demo · shop view' : 'Demo · owner view');
+  $('#demoGuide').hidden = Boolean(token);
+  $('#demoHeading').textContent = demoShop ? 'You’re viewing a sample shop' : 'Try a stock movement';
+  $('#demoInstructions').textContent = demoShop
+    ? 'This shop view shows one location. Adjust a quantity or add a product for this shop.'
+    : 'Choose a product, select Adjust stock and record an item going out. Check the movement log for the new quantity and timestamp.';
+  $('#resetDemo').hidden = Boolean(demoShop);
+  const previewShop = sample.shops.find(shop => shop.id === selected) || sample.shops[0];
+  $('#shopPreview').href = demoShop ? './' : '?sample-shop=' + previewShop.id;
+  $('#shopPreview').textContent = demoShop ? 'Back to owner demo' : 'Try the shop view';
   $('#connect').hidden = Boolean(token);
-  $('#owner').hidden = false;
   $('#shopForm').hidden = !owner;
   $('#shopForm').style.display = owner ? '' : 'none';
   $('#shopActions').hidden = !owner || !activeShop;
   $('#link').hidden = !token;
   $('#shops').innerHTML = visibleShops.map(shop => `<option value="${shop.id}">${h(shop.name)}${shop.active ? '' : ' (archived)'}</option>`).join('');
   $('#shops').value = selected ?? '';
+  $('#shops').disabled = !owner;
   const products = activeShop ? data.products.filter(p => p.active && (!p.shop_id || p.shop_id === selected)) : [];
   const amount = id => data.stock.find(row => row.shop_id === selected && row.product_id === id)?.quantity ?? 0;
   const emptyInventory = selected && !activeShop ? 'Archived shop. Its movements are available below.' : 'Add a shop and a product to start tracking stock.';
@@ -57,10 +67,12 @@ function render() {
     <td>${kinds[m.kind]}</td><td>${m.before_qty}</td><td>${m.after_qty}</td><td>${m.actor}</td><td>${h(m.note)}</td></tr>`).join('') || '<tr><td colspan="7">No movements for this shop yet.</td></tr>';
 }
 
-function openDemo() {
+function openDemo(shopId = '') {
   token = '';
   try { data = JSON.parse(localStorage.getItem(demoKey)) || structuredClone(sample); }
   catch { data = structuredClone(sample); }
+  demoShop = sample.shops.some(shop => shop.id === shopId) ? shopId : '';
+  selected = demoShop || undefined;
   $('#share').replaceChildren();
   status('');
   render();
@@ -94,13 +106,23 @@ function submit(form, callback) {
   });
 }
 
-$('#demo').onclick = openDemo;
+$('#demo').onclick = () => { history.replaceState(null, '', location.pathname); openDemo(); };
+$('#resetDemo').onclick = () => {
+  if (!confirm('Reset the fictional stock and movement history in this browser?')) return;
+  try { localStorage.removeItem(demoKey); }
+  catch { status('This browser did not allow the demo to reset.'); return; }
+  openDemo();
+  status('Sample data reset.');
+};
 $('#connect').onclick = () => $('#connectDialog').showModal();
 for (const button of document.querySelectorAll('[data-close]')) button.onclick = () => button.closest('dialog').close();
 submit($('#connectForm'), async fields => {
   token = fields.key;
   try {
     data = await api('dashboard');
+    demoShop = '';
+    selected = undefined;
+    history.replaceState(null, '', location.pathname);
     $('#connectDialog').close();
     $('#connectForm').reset();
     status('');
@@ -117,7 +139,8 @@ submit($('#shopForm'), async fields => {
 });
 submit($('#productForm'), async fields => {
   if (!fields.name.trim()) return status('Enter a product name.');
-  if (await change('products', fields, () => data.products.push({id:crypto.randomUUID(),name:fields.name.trim(),sku:fields.sku.trim(),active:1}))) $('#productForm').reset();
+  if (demoShop && !selected) return status('This sample shop is archived. Reset the sample data in the owner demo.');
+  if (await change('products', fields, () => data.products.push({id:crypto.randomUUID(),name:fields.name.trim(),sku:fields.sku.trim(),shop_id:demoShop || null,active:1}))) $('#productForm').reset();
 });
 $('#shops').onchange = event => { selected = event.target.value; $('#share').replaceChildren(); render(); };
 $('#link').onclick = async () => {
@@ -161,7 +184,7 @@ submit($('#movementForm'), async fields => {
     if (after < 0 || after > 100000000) throw new Error('This change exceeds the available stock or quantity limit.');
     if (row) row.quantity = after;
     else data.stock.push({shop_id:shopId,product_id:productId,quantity:after});
-    data.movements.unshift({shop_id:shopId,product_id:productId,kind,before_qty:before,after_qty:after,note,actor:'owner',recorded_at:new Date().toISOString()});
+    data.movements.unshift({shop_id:shopId,product_id:productId,kind,before_qty:before,after_qty:after,note,actor:demoShop ? 'shop' : 'owner',recorded_at:new Date().toISOString()});
     data.movements.length = Math.min(data.movements.length,200);
   }, 'Movement saved.');
   if (saved) $('#movementDialog').close();
@@ -172,4 +195,4 @@ if (token) {
     openDemo();
     status(error.message);
   });
-} else openDemo();
+} else openDemo(new URLSearchParams(location.search).get('sample-shop'));

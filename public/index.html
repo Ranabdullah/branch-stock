@@ -2,6 +2,10 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Branch Stock</title><link rel="stylesheet" href="style.css"><script defer src="app.js"></script>
 <body><header><div><strong>Branch Stock</strong><span id="mode">Demo · sample products</span></div><div><button id="demo">Open demo</button> <button id="connect">Connect as owner</button></div></header>
 <main><h1 id="title">Stock by shop</h1><p id="message" role="status"></p>
+<section id="demoGuide" class="demo-guide" hidden aria-label="Demo controls">
+  <div><h2 id="demoHeading">Try a stock movement</h2><p id="demoInstructions">Choose a product, select Adjust stock and record an item going out. Check the movement log for the new quantity and timestamp.</p><p class="muted">Sample changes stay in this browser.</p></div>
+  <div id="demoControls"><a class="button" id="shopPreview" href="?sample-shop=harbour">Try the shop view</a><button id="resetDemo">Reset sample data</button></div>
+</section>
 <section id="owner" aria-label="Manage stock"><form id="shopForm"><label>New shop <input name="name" required maxlength="100" placeholder="Shop name"></label><button>Add shop</button></form>
 <form id="productForm"><label>New product <input name="name" required maxlength="100" placeholder="Product name"></label><label>SKU <input name="sku" maxlength="60" placeholder="Optional"></label><button>Add product</button></form></section>
 <section id="inventory"><div class="section-head"><h2>Inventory</h2><label>Shop <select id="shops"></select></label></div>
