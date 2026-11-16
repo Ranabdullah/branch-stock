@@ -2620,7 +2620,6 @@
     // ═══════════════════════════════════
     const LOW = 3;
     const ADMIN_PIN_CODE = localStorage.getItem('branch_classic_pin') || '';
-    const APPS_SCRIPT_URL = '';
 
     // ═══════════════════════════════════
     // STATE
@@ -3608,26 +3607,7 @@
       return null;
     }
 
-    async function pushExpiryUpdate(uid) {
-      try {
-        const item = getItemByUid(uid);
-        if (!item) return;
-        const { brand, flavor } = item;
-        const q = state[uid] ?? STORES.map(() => 0), o = oState[uid] ?? STORES.map(() => 0);
-        const row = { brand, flavor, uid, updated_by: currentUser, updated_at: new Date().toISOString() };
-        STORES.forEach((s, i) => {
-          row[s.toLowerCase()] = q[i] ?? 0;
-          row['order_' + s.toLowerCase()] = o[i] ?? 0;
-          row['Expiry ' + s] = expiry[uid]?.[i] || '';
-        });
-        setSB('syncing');
-        await fetch(APPS_SCRIPT_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'update', uid: uid, data: row })
-        });
-        setSB('synced');
-      } catch (e) { setSB('error'); }
-    }
+    function pushExpiryUpdate() { setSB('local'); }
 
     function saveExpiry() {
       const val = document.getElementById('expiryInput').value;
@@ -4005,10 +3985,6 @@
         delete state[uid];
         if (oState[uid]) delete oState[uid];
         if (expiry[uid]) delete expiry[uid];
-        fetch(APPS_SCRIPT_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'delete', uid: uid })
-        }).catch(() => {});
       });
       saveLocal(); saveExpiries();
       renderBrandSettings();
@@ -4063,11 +4039,6 @@
       if (oState[uid]) delete oState[uid];
       if (expiry[uid]) delete expiry[uid];
       saveLocal(); saveExpiries(); setSB('local');
-      setSB('syncing');
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'delete', uid: uid })
-      }).then(() => { setSB('synced'); isDirty = false; }).catch(() => setSB('error'));
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -4354,12 +4325,7 @@ tbl +
 
     let isSyncing = false;
 
-    function restartAutoRefresh() {
-      if (window.syncInterval) clearInterval(window.syncInterval);
-      window.syncInterval = setInterval(() => {
-        if (!isSyncing && !isDirty && currentUser) syncFromSheets(true);
-      }, 30000);
-    }
+    function restartAutoRefresh() { setSB('local'); }
 
     let isDirty = false;
     let dirtyTimer = null;
@@ -4370,247 +4336,11 @@ tbl +
       dirtyTimer = setTimeout(() => { isDirty = false; }, 8000);
     }
 
-    async function syncToSheets() {
-      try {
-        isSyncing = true;
-        setSB('syncing');
+    function syncToSheets() { setSB('local'); }
 
-        const localSnapshot = JSON.parse(JSON.stringify(state));
-        const res = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) throw new Error('Fetch failed');
-        const sheetRows = await res.json();
+    function syncFromSheets() { setSB('local'); }
 
-        const localOSnapshot = JSON.parse(JSON.stringify(oState));
-
-        brands = {}; state = {}; oState = {};
-        if (Array.isArray(sheetRows)) {
-          sheetRows.forEach(row => {
-            let { brand, flavor, uid } = row;
-            if (!brand || !flavor || brand === '__config__') return;
-            if (!uid) uid = brand + '|' + flavor;
-
-            if (!brands[brand]) brands[brand] = [];
-            if (!brands[brand].find(item => item.uid === uid)) brands[brand].push({ flavor, uid });
-
-            state[uid] = STORES.map(s => parseInt(row[s.toLowerCase()]) || 0);
-
-            oState[uid] = STORES.map((s, i) => {
-              const k = 'order_' + s.toLowerCase();
-              const tk = 'orde_' + s.toLowerCase();
-              const val = row[k] !== undefined ? row[k] : (row[tk] !== undefined ? row[tk] : undefined);
-              if (val !== undefined && val !== '') return parseInt(val) || 0;
-              return defOrder(brand, uid, i, state[uid][i]);
-            });
-
-            STORES.forEach((s, i) => {
-              const expKey = 'Expiry ' + s;
-              if (!expiry[uid]) expiry[uid] = [];
-              expiry[uid][i] = row[expKey] || '';
-            });
-          });
-        }
-
-        const rowsToPush = [];
-        Object.keys(localSnapshot).forEach(uid => {
-          if (!state[uid]) return;
-          const item = getItemByUid(uid);
-          if (!item) return;
-
-          const localVals = localSnapshot[uid];
-          const sheetVals = state[uid];
-          const localOVals = localOSnapshot[uid] || STORES.map(() => 0);
-          const sheetOVals = oState[uid] || STORES.map(() => 0);
-
-          const hasChange = localVals.some((v, i) => v !== sheetVals[i]) ||
-                            localOVals.some((v, i) => v !== sheetOVals[i]);
-
-          if (hasChange) {
-            const row = { brand: item.brand, flavor: item.flavor, uid, updated_by: currentUser, updated_at: new Date().toISOString() };
-            STORES.forEach((s, i) => {
-              row[s.toLowerCase()] = localVals[i] ?? 0;
-              const k = orderKeys[i] || ('order_' + s.toLowerCase());
-              row[k] = localOVals[i] ?? 0;
-              row['Expiry ' + s] = expiry[uid]?.[i] || '';
-
-              if (localVals[i] !== sheetVals[i] || localOVals[i] !== sheetOVals[i]) {
-                row['updated_by_' + s.toLowerCase()] = currentUser;
-                row['updated_at_' + s.toLowerCase()] = new Date().toISOString();
-              }
-            });
-            state[uid] = localVals;
-            oState[uid] = localOVals;
-            rowsToPush.push(row);
-          }
-        });
-
-        if (rowsToPush.length > 0) {
-          await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'upsert_all', data: rowsToPush })
-          });
-        }
-
-        saveLocal(); setSB('synced');
-        isDirty = false;
-        toast(rowsToPush.length > 0 ? 'Synced to Google Sheets' : 'Already up to date');
-        render();
-      } catch (e) { setSB('error'); toast('Sync failed — check Apps Script URL', true); }
-      finally { isSyncing = false; restartAutoRefresh(); }
-    }
-
-    async function syncFromSheets(silent = false) {
-      if (isSyncing) return;
-      if (isDirty) return;
-      try {
-        setSB('syncing');
-        const res = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) throw new Error();
-        const rows = await res.json();
-        if (!Array.isArray(rows) || !rows.length) { if (!silent) toast('No data in sheet', true); return; }
-
-        brands = {}; state = {}; oState = {};
-
-        const cfgRow = rows.find(r => r.brand === '__config__');
-        if (cfgRow && cfgRow.config_data) {
-          try {
-            const cfg = JSON.parse(cfgRow.config_data);
-            if (cfg.stores && Array.isArray(cfg.stores) && cfg.stores.length >= 1) {
-              STORES = cfg.stores;
-              try { localStorage.setItem(LS_STORES, JSON.stringify(STORES)); } catch (e) { }
-              rebuildStoreDropdown();
-            }
-            if (cfg.admins && Array.isArray(cfg.admins) && cfg.admins.length >= 1) {
-              ADMINS = cfg.admins;
-              saveAdmins();
-              rebuildAdminDropdown();
-            }
-            if (cfg.notes && Array.isArray(cfg.notes)) {
-              staffNotes = cfg.notes;
-              saveStaffNotes();
-              updateNotesBadge();
-              const overlay = document.getElementById('notesDrawerOverlay');
-              if (overlay && overlay.classList.contains('open') && !isDrawerMinimized) {
-                renderStaffNotes();
-              }
-            }
-            if (cfg.staff && typeof cfg.staff === 'object') {
-              STAFF_BY_STORE = cfg.staff;
-              saveStaffByStore();
-            }
-          } catch (e) { }
-        }
-
-        rows.forEach(row => {
-          let { brand, flavor, uid } = row;
-          if (!brand || !flavor || brand === '__config__') return;
-          if (!uid) uid = brand + '|' + flavor;
-
-          if (!brands[brand]) brands[brand] = [];
-          if (!brands[brand].find(item => item.uid === uid)) brands[brand].push({ flavor, uid });
-
-          const oldVals = state[uid] || STORES.map(() => 0);
-          const newVals = STORES.map(s => parseInt(row[s.toLowerCase()]) || 0);
-
-          state[uid] = newVals;
-
-          oState[uid] = STORES.map((s, i) => {
-            const k = 'order_' + s.toLowerCase();
-            const tk = 'orde_' + s.toLowerCase();
-            if (row[tk] !== undefined) orderKeys[i] = tk;
-            else if (row[k] !== undefined) orderKeys[i] = k;
-
-            const val = row[k] !== undefined ? row[k] : (row[tk] !== undefined ? row[tk] : undefined);
-            if (val !== undefined && val !== '') return parseInt(val) || 0;
-            return defOrder(brand, uid, i, state[uid][i]);
-          });
-
-          STORES.forEach((s, i) => {
-            const perStoreTs = row['updated_at_' + s.toLowerCase()];
-            if (perStoreTs) {
-              if (!storeMaxTs[s] || new Date(perStoreTs) > new Date(storeMaxTs[s])) {
-                storeMaxTs[s] = perStoreTs;
-              }
-            }
-
-            const expKey = 'Expiry ' + s;
-            const eVal = row[expKey] || '';
-            if (!expiry[uid]) expiry[uid] = [];
-            expiry[uid][i] = eVal;
-
-            if (!isFirstLoad && oldVals[i] !== newVals[i]) {
-              const perStoreChanger = row['updated_by_' + s.toLowerCase()];
-              const changer = perStoreChanger || row.updated_by || 'Staff';
-              if (!ADMINS.includes(changer)) {
-                const perStoreTs = row['updated_at_' + s.toLowerCase()];
-                const tsToUse = perStoreTs || row.updated_at || new Date().toISOString();
-                const isDup = actLog.some(l => l.user === changer && l.store === s && l.brand === brand && l.flavor === flavor && l.to === newVals[i] && l.ts === tsToUse);
-                if (!isDup) {
-                  actLog.unshift({
-                    user: changer,
-                    store: s,
-                    brand, flavor,
-                    from: oldVals[i],
-                    to: newVals[i],
-                    ts: tsToUse
-                  });
-                }
-              }
-            }
-          });
-        });
-
-        if (!isFirstLoad) {
-          actLog.sort((a, b) => new Date(b.ts) - new Date(a.ts));
-          if (actLog.length > MAX_LOG) actLog = actLog.slice(0, MAX_LOG);
-          try { localStorage.setItem(LS_LOG, JSON.stringify(actLog)); } catch (e) { }
-        }
-        isFirstLoad = false;
-
-        saveLocal(); setSB('synced');
-        if (!silent) toast('Refreshed from Google Sheets');
-        if (currentUser) render();
-      } catch (e) {
-        if (!silent) { setSB('error'); toast('Could not load from Sheets — using local data', true); }
-      }
-    }
-
-    async function pushUpdate(uid, isNew = false) {
-      try {
-        isSyncing = true;
-        const item = getItemByUid(uid);
-        if (!item) return;
-        const { brand, flavor } = item;
-        const q = state[uid], o = oState[uid] ?? STORES.map(() => 0);
-        const _now = new Date().toISOString();
-        const row = { brand, flavor, uid, updated_by: currentUser, updated_at: _now };
-        if (curStore >= 0 && curStore < STORES.length) {
-          const sName = STORES[curStore].toLowerCase();
-          row['updated_by_' + sName] = currentUser;
-          row['updated_at_' + sName] = _now;
-        }
-        STORES.forEach((s, i) => {
-          row[s.toLowerCase()] = q[i] ?? 0;
-          const k = orderKeys[i] || ('order_' + s.toLowerCase());
-          row[k] = o[i] ?? 0;
-          row['Expiry ' + s] = expiry[uid]?.[i] || '';
-        });
-        setSB('syncing');
-        if (isNew) {
-          await fetch(APPS_SCRIPT_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'append', data: [row] })
-          });
-        } else {
-          await fetch(APPS_SCRIPT_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'update', uid: uid, data: row })
-          });
-        }
-        setSB('synced');
-      } catch (e) { setSB('error'); }
-      finally { isSyncing = false; restartAutoRefresh(); }
-    }
+    function pushUpdate() { setSB('local'); }
 
     // ═══════════════════════════════════
     // ADMIN LIST
@@ -4825,19 +4555,7 @@ tbl +
       renderAdminSettings();
     }
 
-    async function pushSettingsToSheet() {
-      try {
-        const row = {
-          brand: '__config__', flavor: 'settings', uid: '__config__|settings',
-          updated_by: currentUser, updated_at: new Date().toISOString(),
-          config_data: JSON.stringify({ stores: STORES, admins: ADMINS, notes: staffNotes, staff: STAFF_BY_STORE })
-        };
-        await fetch(APPS_SCRIPT_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'update', uid: '__config__|settings', data: row })
-        });
-      } catch (e) { console.warn('Settings sync failed', e); }
-    }
+    function pushSettingsToSheet() { setSB('local'); }
 
     function saveSettings() {
       const storeInputs = document.querySelectorAll('#storeSettingsList .settings-item input');
@@ -4908,21 +4626,7 @@ tbl +
       rebuildAdminDropdown(); rebuildStoreDropdown();
       closeModal('settingsModal');
       render();
-      toast('Settings saved — syncing to sheet...');
-
-      pushSettingsToSheet();
-
-      if (renamedRows.length > 0) {
-        setSB('syncing');
-        fetch(APPS_SCRIPT_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'upsert_all', data: renamedRows })
-        }).then(() => {
-          setTimeout(() => syncToSheets(), 1500);
-        }).catch(() => setSB('error'));
-      } else {
-        syncToSheets();
-      }
+      toast('Settings saved on this device.');
     }
 
     function rebuildStoreDropdown() {
