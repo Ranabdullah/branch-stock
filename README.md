@@ -17,3 +17,5 @@ The movement log records the server timestamp, before and after quantities, whet
 5. Run `npx wrangler deploy --config wrangler.live.jsonc`.
 6. Generate an owner key locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it in your password manager and enter it at the prompt from `npx wrangler secret put OWNER_KEY --config wrangler.live.jsonc`.
 7. Open the Worker URL and choose **Connect as owner**. Use your key to create a shop and product. Keep the key private.
+
+The [original stock manager demo](https://branch-stock-demo.ranakaharian1.workers.dev/classic/) retains the original shop tabs, grouped stock grid, order counts, expiry and movement reporting with fictional products.
