@@ -2549,7 +2549,7 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-left">
-      <div class="logo">Branch Stock <span class="version-tag">Sample workspace</span></div>
+      <div class="logo"><b id="classicWorkspaceName">Branch Stock</b> <span class="version-tag">Sample workspace</span></div>
       <span id="adminBadge" class="admin-badge" style="display:none">Admin</span>
       <div class="store-tabs" id="storeTabs"></div>
       <div id="userPill" style="display:none"></div>
@@ -2561,7 +2561,7 @@
       </div>
       <button class="btn btn-sm btn-accent" id="notesHeaderBtn" onclick="openNotesDrawer()" title="Staff Requests & Notes">💬 Notes / مسائل <span id="notesCountBadge" class="notes-badge" style="display:none">0</span></button>
 
-      <button class="btn btn-sm" id="movementsDemo">Movements</button><button class="btn btn-sm" id="logBtn" style="display:none" onclick="openLog()" title="Activity log">Log</button>
+      <button class="btn btn-sm" id="addClassicShop">Add shop</button><button class="btn btn-sm" id="renameClassic">Rename</button><button class="btn btn-sm" id="shareClassic">Share shop</button><button class="btn btn-sm" id="movementsDemo">Movements</button><button class="btn btn-sm" id="logBtn" style="display:none" onclick="openLog()" title="Activity log">Log</button>
       <button class="btn btn-sm" id="settingsBtn" style="display:none" onclick="openSettings()" title="Settings & Product Management">Settings</button>
       <button class="btn btn-sm" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">Theme</button>
 
@@ -4682,6 +4682,49 @@ tbl +
     sessionStorage.setItem('branch_classic_welcome_shown_' + currentUser, 'true');
     applySession();
     setSB('local');
+    const renamed = localStorage.getItem('branch_classic_workspace_name');
+    if (renamed) document.getElementById('classicWorkspaceName').textContent = renamed;
+    const previewShop = new URLSearchParams(location.search).get('sample');
+    if (previewShop && STORES.includes(previewShop)) setStore(STORES.indexOf(previewShop));
+    document.getElementById('addClassicShop').onclick = () => {
+      const name = prompt('New shop name')?.trim();
+      if (!name) return;
+      if (name.length > 80 || STORES.some(shop => shop.toLowerCase() === name.toLowerCase())) {
+        toast('Use a unique shop name of up to 80 characters.', true);
+        return;
+      }
+      STORES.push(name);
+      for (const id of Object.keys(state)) {
+        state[id].push(0);
+        oState[id] ||= [];
+        oState[id].push(0);
+      }
+      rebuildStoreDropdown();
+      saveLocal();
+      setStore(STORES.length - 1);
+      toast('Shop added on this device.');
+    };
+    document.getElementById('renameClassic').onclick = () => {
+      const header = document.getElementById('classicWorkspaceName');
+      const name = prompt('Workspace name', header.textContent)?.trim();
+      if (!name) return;
+      if (name.length > 100) return toast('Use up to 100 characters.', true);
+      localStorage.setItem('branch_classic_workspace_name',name);
+      header.textContent = name;
+      toast('Workspace name saved on this device.');
+    };
+    document.getElementById('shareClassic').onclick = async () => {
+      const shop = STORES[curStore];
+      const shareable = ['Harbour Shop','Market Shop','Station Shop'].includes(shop);
+      if (!shareable || confirm('Copy a fictional shop preview? Choose Cancel to open the shared workspace and make a private link.')) {
+        if (!shareable) { location.assign('../'); return; }
+        const url = new URL(location.href);
+        url.search = '';
+        url.searchParams.set('sample',shop);
+        try { await navigator.clipboard.writeText(url.href); toast('Sample link copied. It contains no stock records.'); }
+        catch { prompt('Copy the sample link',url.href); }
+      } else location.assign('../');
+    };
   </script>
 <script src="movement-demo.js"></script></body>
 </html>

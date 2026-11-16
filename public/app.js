@@ -39,6 +39,8 @@ function render() {
   const visibleShops = [...shops, ...archived];
   if (!visibleShops.some(shop => shop.id === selected)) selected = visibleShops[0]?.id;
   const activeShop = shops.some(shop => shop.id === selected);
+  $('#workspaceName').textContent = data.name || 'Branch Stock';
+  $('#rename').hidden = !owner;
   $('#mode').textContent = token ? (owner ? 'Owner workspace' : 'Shop workspace') : (demoShop ? 'Demo · shop view' : 'Demo · owner view');
   $('#demoGuide').hidden = Boolean(token);
   $('#demoHeading').textContent = demoShop ? 'You’re viewing a sample shop' : 'Try a stock movement';
@@ -115,6 +117,11 @@ $('#resetDemo').onclick = () => {
   status('Sample data reset.');
 };
 $('#connect').onclick = () => $('#connectDialog').showModal();
+$('#rename').onclick = () => {
+  const name = prompt('Workspace name', data.name || 'Branch Stock')?.trim();
+  if (name && name.length <= 100) return change('workspace', {name}, () => { data.name = name; }, 'Workspace name saved.');
+  if (name) status('Use up to 100 characters.');
+};
 for (const button of document.querySelectorAll('[data-close]')) button.onclick = () => button.closest('dialog').close();
 submit($('#connectForm'), async fields => {
   token = fields.key;

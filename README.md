@@ -19,3 +19,5 @@ The movement log records the server timestamp, before and after quantities, whet
 7. Open the Worker URL and choose **Connect as owner**. Use your key to create a shop and product. Keep the key private.
 
 The [original stock manager demo](https://branch-stock-demo.ranakaharian1.workers.dev/classic/) retains the original shop tabs, grouped stock grid, order counts, expiry and movement reporting with fictional products.
+
+The classic demo supports adding shops, renaming the local workspace and copying fictional shop preview links. Connect as owner at the shared workspace for real shop links and a shared workspace name.

@@ -23,13 +23,14 @@ async function dashboard(env, access) {
   const owner = access.role === 'owner';
   const scope = owner ? null : access.shopId;
   const shop = owner ? null : access.shopId;
-  const [shops, products, stock, movements] = await env.DB.batch([
+  const [shops, products, stock, movements, workspace] = await env.DB.batch([
     env.DB.prepare('SELECT id, name, active FROM shops WHERE (? IS NULL OR id = ?) ORDER BY name').bind(scope, scope),
     env.DB.prepare('SELECT id, name, sku, shop_id, active FROM products WHERE (? IS NULL OR shop_id IS NULL OR shop_id = ?) ORDER BY name').bind(scope, scope),
     env.DB.prepare('SELECT shop_id, product_id, quantity FROM stock WHERE (? IS NULL OR shop_id = ?)').bind(shop, shop),
-    env.DB.prepare('SELECT * FROM movements WHERE (? IS NULL OR shop_id = ?) ORDER BY recorded_at DESC, rowid DESC LIMIT 200').bind(shop, shop)
+    env.DB.prepare('SELECT * FROM movements WHERE (? IS NULL OR shop_id = ?) ORDER BY recorded_at DESC, rowid DESC LIMIT 200').bind(shop, shop),
+    env.DB.prepare('SELECT name FROM workspace_settings WHERE id = 1')
   ]);
-  return json({ role: access.role, shopId: access.shopId, shops: shops.results, products: products.results, stock: stock.results, movements: movements.results });
+  return json({ role: access.role, shopId: access.shopId, name: workspace.results[0]?.name, shops: shops.results, products: products.results, stock: stock.results, movements: movements.results });
 }
 
 async function move(db, access, data) {
@@ -94,6 +95,11 @@ async function handle(request, env) {
     return json({ id: productId }, 201);
   }
   if (access.role !== 'owner') return error('Owner access is required.', 403);
+  if (url.pathname === '/api/workspace') {
+    if (!name) return error('Enter a workspace name.');
+    await db.prepare('INSERT INTO workspace_settings(id,name) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').bind(name).run();
+    return json({ saved: true });
+  }
   if (url.pathname === '/api/shops') {
     if (!name) return error('Enter a shop name.');
     const id = crypto.randomUUID();
